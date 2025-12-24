@@ -46,6 +46,7 @@ object ServerReplay: ModInitializer {
         AutomaticRecorders.registerEvents()
         RecorderNotifier.registerEvents()
         RecorderRecoverer.registerEvents()
+        DeathCamRecorder.registerEvents()
 
         GlobalEventHandler.Server.register<ServerRegisterCommandEvent> {
             it.register(ReplayCommand)

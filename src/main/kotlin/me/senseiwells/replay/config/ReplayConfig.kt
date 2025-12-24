@@ -109,6 +109,8 @@ data class ReplayConfig(
     @JsonNames("enabled")
     @SerialName("automatically_record")
     val automaticallyRecord: Boolean = false,
+    @SerialName("death_cam")
+    val deathCam: Boolean = false,
     @SerialName("player_predicate")
     val playerPredicate: ReplayPlayerPredicate = NonePredicate,
     @SerialName("chunks")
