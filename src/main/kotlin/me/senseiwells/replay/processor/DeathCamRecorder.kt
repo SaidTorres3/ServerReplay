@@ -1,6 +1,10 @@
 package me.senseiwells.replay.processor
 
 import me.senseiwells.replay.ServerReplay
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import net.casual.arcade.events.GlobalEventHandler
 import net.casual.arcade.events.ListenerRegistry.Companion.register
 import net.casual.arcade.events.server.player.PlayerDeathEvent
@@ -9,6 +13,7 @@ import net.casual.arcade.events.server.player.PlayerLoginEvent
 import net.casual.arcade.replay.events.ReplayRecorderSaveEvent
 import net.casual.arcade.replay.recorder.player.ReplayPlayerRecorders
 import net.casual.arcade.replay.recorder.settings.RecorderSettings
+import net.casual.arcade.utils.PlayerUtils.server
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import java.nio.file.Files
@@ -16,6 +21,7 @@ import java.nio.file.Path
 import java.util.*
 import kotlin.collections.ArrayDeque
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 import net.casual.arcade.replay.recorder.settings.SimpleRecorderSettings
 
@@ -25,6 +31,7 @@ object DeathCamRecorder {
     private val deletable = HashMap<UUID, ArrayDeque<Path>>()
     private val preserveNext = HashSet<UUID>()
     private val recorders = HashSet<UUID>()
+    private val pendingStops = HashSet<UUID>()
 
     internal fun registerEvents() {
         GlobalEventHandler.Server.register<PlayerLoginEvent> { (server, profile) ->
@@ -36,6 +43,7 @@ object DeathCamRecorder {
             this.deletable.remove(player.uuid)
             this.preserveNext.remove(player.uuid)
             this.recorders.remove(player.uuid)
+            this.pendingStops.remove(player.uuid)
         }
         GlobalEventHandler.Server.register<PlayerDeathEvent> { (player, _) ->
             this.onDeath(player)
@@ -99,6 +107,33 @@ object DeathCamRecorder {
         this.deletable.remove(player.uuid)
         // Preserve the current recording (when it finishes)
         this.preserveNext.add(player.uuid)
+        this.stopAfterDeath(player)
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun stopAfterDeath(player: ServerPlayer) {
+        val uuid = player.uuid
+        if (!this.pendingStops.add(uuid)) {
+            return
+        }
+        val server = player.server
+        val expectedPath = ServerReplay.config.playerRecordingPath
+            .resolve("deathcam")
+            .resolve(player.gameProfile.name)
+        GlobalScope.launch {
+            delay(2.seconds)
+            server.execute {
+                try {
+                    for (recorder in ReplayPlayerRecorders.recorders()) {
+                        if (recorder.location.startsWith(expectedPath)) {
+                            recorder.stop(true)
+                        }
+                    }
+                } finally {
+                    this@DeathCamRecorder.pendingStops.remove(uuid)
+                }
+            }
+        }
     }
 
     private fun onReplaySave(event: ReplayRecorderSaveEvent) {
