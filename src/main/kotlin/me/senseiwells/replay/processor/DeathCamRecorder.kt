@@ -19,6 +19,8 @@ import kotlin.time.Duration.Companion.minutes
 
 import net.casual.arcade.replay.recorder.settings.SimpleRecorderSettings
 
+import com.mojang.authlib.GameProfile
+
 object DeathCamRecorder {
     private val deletable = HashMap<UUID, ArrayDeque<Path>>()
     private val preserveNext = HashSet<UUID>()
@@ -27,10 +29,7 @@ object DeathCamRecorder {
     internal fun registerEvents() {
         GlobalEventHandler.Server.register<PlayerLoginEvent> { (server, profile) ->
             if (ServerReplay.config.deathCam) {
-                val player = server.playerList.getPlayer(profile.id)
-                if (player != null) {
-                    this.start(server, player)
-                }
+                this.start(server, profile)
             }
         }
         GlobalEventHandler.Server.register<PlayerLeaveEvent> { (player) ->
@@ -47,8 +46,8 @@ object DeathCamRecorder {
         )
     }
 
-    private fun start(server: MinecraftServer, player: ServerPlayer) {
-        val path = ServerReplay.config.playerRecordingPath.resolve("deathcam").resolve(player.scoreboardName)
+    private fun start(server: MinecraftServer, profile: GameProfile) {
+        val path = ServerReplay.config.playerRecordingPath.resolve("deathcam").resolve(profile.name)
         val format = ServerReplay.config.defaultReplayFormat
         val config = ServerReplay.config
         
@@ -84,11 +83,12 @@ object DeathCamRecorder {
             config.recordVoiceChat
         )
 
-        val recorder = ReplayPlayerRecorders.create(server, player.gameProfile, path, format, settings)
+        val recorder = ReplayPlayerRecorders.create(server, profile, path, format, settings)
         recorder.onStart()
         recorder.afterLogin()
         
-        this.recorders.add(player.uuid)
+        this.recorders.add(profile.id)
+        ServerReplay.logger.info("Started death cam recording for ${profile.name}")
     }
 
     private fun onDeath(player: ServerPlayer) {
