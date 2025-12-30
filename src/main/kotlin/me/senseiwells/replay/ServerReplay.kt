@@ -1,7 +1,6 @@
 package me.senseiwells.replay
 
 import com.google.gson.JsonObject
-import me.senseiwells.replay.commands.PackCommand
 import me.senseiwells.replay.commands.ReplayCommand
 import me.senseiwells.replay.config.ReplayConfig
 import me.senseiwells.replay.http.DownloadReplaysHttpInjector
@@ -20,6 +19,19 @@ import net.minecraft.server.MinecraftServer
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+/**
+ * Death Cam Recorder - Automatic death POV capture for Minecraft servers
+ * 
+ * This mod continuously records players in survival mode with a 1-minute rolling buffer.
+ * When a player dies, the recording is automatically saved.
+ * 
+ * Features:
+ * - Automatic recording for survival mode players
+ * - 1-minute rolling buffer (configurable)
+ * - Death-triggered save (2 seconds after death)
+ * - Game mode aware (won't record creative/spectator)
+ * - Perfect for UHC servers and competitive gameplay
+ */
 object ServerReplay: ModInitializer {
     const val MOD_ID = "server-replay"
 
@@ -34,7 +46,7 @@ object ServerReplay: ModInitializer {
         private set
 
     override fun onInitialize() {
-        this.logger.info("Launching ServerReplay!")
+        this.logger.info("Launching Death Cam Recorder!")
 
         @Suppress("DEPRECATION")
         ReplayConfig.migrateOldConfigs()
@@ -43,16 +55,15 @@ object ServerReplay: ModInitializer {
 
         InjectFabric.INSTANCE.registerInjector(DownloadReplaysHttpInjector)
 
-        AutomaticRecorders.registerEvents()
+        // Register death cam recorder - this is the main feature
+        DeathCamRecorder.registerEvents()
+        
+        // Keep notifier and recoverer for replay management
         RecorderNotifier.registerEvents()
         RecorderRecoverer.registerEvents()
-        DeathCamRecorder.registerEvents()
 
         GlobalEventHandler.Server.register<ServerRegisterCommandEvent> {
             it.register(ReplayCommand)
-            if (this.config.debug) {
-                it.register(PackCommand)
-            }
         }
         GlobalEventHandler.Server.register<ReplayRecorderStartEvent> { (recorder) ->
             recorder.addMetadataProvider(this::addMetadata)
@@ -60,6 +71,8 @@ object ServerReplay: ModInitializer {
 
         ReplayCleanerUpper.run()
         RecorderWarner.output(this.logger::warn)
+        
+        this.logger.info("Death Cam Recorder initialized - recording survival players automatically")
     }
 
     fun getIp(server: MinecraftServer): String {
@@ -88,5 +101,6 @@ object ServerReplay: ModInitializer {
 
     private fun addMetadata(data: JsonObject) {
         data.addProperty("server_replay_version", this.version)
+        data.addProperty("recorder_type", "death_cam")
     }
 }

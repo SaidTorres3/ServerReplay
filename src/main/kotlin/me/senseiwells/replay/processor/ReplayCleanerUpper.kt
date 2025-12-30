@@ -17,44 +17,16 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 
+/**
+ * ReplayCleanerUpper - Disabled for death cam mode
+ * 
+ * Death cam recordings are kept until manually deleted.
+ * This object is kept for backwards compatibility but does nothing.
+ */
 object ReplayCleanerUpper {
     @OptIn(DelicateCoroutinesApi::class)
-    internal fun run() = GlobalScope.launch {
-        while (true) {
-            delay(10.minutes)
-            val duration = ServerReplay.config.deleteReplaysAfterDuration
-            if (duration.isPositive()) {
-                cleanUpFiles(duration)
-            }
-        }
-    }
-
-    private fun cleanUpFiles(duration: Duration) {
-        for (path in ServerReplay.config.getRootRecordingPaths()) {
-            if (path.isDirectory()) {
-                path.visitFileTree {
-                    onVisitFile { path, _ ->
-                        cleanUpFile(path, duration)
-                        FileVisitResult.CONTINUE
-                    }
-                }
-            }
-        }
-    }
-
-    private fun cleanUpFile(path: Path, duration: Duration) {
-        ReplayFormat.formatOf(path) ?: return
-
-        val delta = (System.currentTimeMillis() - path.getLastModifiedTime().toMillis()).milliseconds
-        if (delta >= duration) {
-            if (ServerReplay.config.logDeletedReplays) {
-                ServerReplay.logger.info("Deleting stale replay, $path")
-            }
-            try {
-                path.deleteIfExists()
-            } catch (e: IOException) {
-                ServerReplay.logger.error("Failed to delete stale replay at $path", e)
-            }
-        }
+    internal fun run() {
+        // Cleanup disabled for death cam mode - recordings are preserved
+        // Users should manually manage their death cam recordings
     }
 }

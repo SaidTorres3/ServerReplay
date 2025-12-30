@@ -9,8 +9,6 @@ import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.json.encodeToStream
 import me.senseiwells.replay.ServerReplay
 import me.senseiwells.replay.config.chunk.ChunkAreaConfig
-import me.senseiwells.replay.config.predicates.NonePredicate
-import me.senseiwells.replay.config.predicates.ReplayPlayerPredicate
 import me.senseiwells.replay.config.serialization.ExtraCodecs
 import me.senseiwells.replay.config.serialization.PathSerializer
 import net.casual.arcade.replay.io.ReplayFormat
@@ -28,6 +26,13 @@ import java.nio.file.Path
 import kotlin.io.path.*
 import kotlin.time.Duration
 
+/**
+ * Configuration for Death Cam Recorder
+ * 
+ * This plugin continuously records players in survival mode with a 1-minute rolling buffer.
+ * When a player dies, the recording is saved to capture their death POV.
+ * Perfect for UHC servers to capture death moments and prevent "lag" excuses.
+ */
 @Serializable
 @OptIn(ExperimentalSerializationApi::class)
 data class ReplayConfig(
@@ -42,31 +47,16 @@ data class ReplayConfig(
     val worldName: String = "World",
     @SerialName("server_name")
     val serverName: String = "Server",
-    @SerialName("chunk_recording_path")
-    @Serializable(with = PathSerializer::class)
-    val chunkRecordingPath: Path = recordings.resolve("chunks"),
     @SerialName("player_recording_path")
     @Serializable(with = PathSerializer::class)
-    val playerRecordingPath: Path = recordings.resolve("players"),
-    @SerialName("player_recording_name")
-    val playerRecordingName: String = "{uuid}",
+    val playerRecordingPath: Path = recordings.resolve("deathcams"),
     @Contextual
     @SerialName("max_file_size")
     val maxFileSize: FileSize = FileSize(0),
     @SerialName("restart_after_max_file_size")
     val restartAfterMaxFileSize: Boolean = false,
-    @Contextual
-    @SerialName("max_duration")
-    val maxDuration: Duration = Duration.ZERO,
-    @SerialName("restart_after_max_duration")
-    val restartAfterMaxDuration: Boolean = false,
     @SerialName("recover_unsaved_replays")
     val recoverUnsavedReplays: Boolean = true,
-    @Contextual
-    @SerialName("delete_replays_after_duration")
-    val deleteReplaysAfterDuration: Duration = Duration.ZERO,
-    @SerialName("log_deleted_replays")
-    val logDeletedReplays: Boolean = true,
     @EncodeDefault(Mode.NEVER)
     @SerialName("fixed_daylight_cycle")
     val fixedDaylightCycle: Long = -1L,
@@ -75,8 +65,6 @@ data class ReplayConfig(
     @Contextual
     @SerialName("chunk_recording_strategy")
     val chunkRecordingStrategy: ChunkRecordingStrategy = ChunkRecordingStrategy.Always,
-    @SerialName("pause_notify_players")
-    val notifyPlayersLoadingChunks: Boolean = true,
     @SerialName("notify_admins_of_status")
     val notifyAdminsOfStatus: Boolean = true,
     @SerialName("include_resource_packs")
@@ -106,25 +94,17 @@ data class ReplayConfig(
     val replayServerIp: String? = null,
     @SerialName("allow_downloading_replays")
     val allowDownloadingReplays: Boolean = false,
-    @JsonNames("enabled")
-    @SerialName("automatically_record")
-    val automaticallyRecord: Boolean = false,
-    @SerialName("death_cam")
-    val deathCam: Boolean = false,
-    @SerialName("player_predicate")
-    val playerPredicate: ReplayPlayerPredicate = NonePredicate,
-    @SerialName("chunks")
-    val chunks: List<ChunkAreaConfig> = listOf(),
 ) {
+    // For backwards compatibility - not used in death cam mode
+    val chunkRecordingPath: Path get() = recordings.resolve("chunks")
+    val chunks: List<ChunkAreaConfig> get() = listOf()
+
     fun getPlayerRecordingLocation(profile: GameProfile): Path {
-        val path = this.playerRecordingName
-            .replace("{uuid}", profile.id.toString())
-            .replace("{username}", profile.name)
-        return this.playerRecordingPath.resolve(path)
+        return this.playerRecordingPath.resolve("deathcam").resolve(profile.name)
     }
 
     fun getRootRecordingPaths(): List<Path> {
-        return listOf(this.playerRecordingPath, this.chunkRecordingPath)
+        return listOf(this.playerRecordingPath)
     }
 
     fun createSettings(): SimpleRecorderSettings {
@@ -139,8 +119,8 @@ data class ReplayConfig(
             RecorderSettings.FileLimits(
                 this.maxFileSize,
                 this.restartAfterMaxFileSize,
-                this.maxDuration,
-                this.restartAfterMaxDuration
+                Duration.ZERO,
+                false
             ),
             RecorderSettings.IgnorePackets(
                 this.ignoreCustomPayloads,

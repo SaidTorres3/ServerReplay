@@ -43,23 +43,19 @@ object RecorderNotifier {
 
     private fun onChunkRecorderLoaded(event: ReplayChunkRecorderLoadedResumeEvent) {
         val recorder = event.recorder
-        if (ServerReplay.config.notifyPlayersLoadingChunks) {
-            recorder.ignore {
-                recorder.server.playerList.broadcastSystemMessage(
-                    Component.literal("Resumed recording for ${recorder.getName()}"), false
-                )
-            }
+        recorder.ignore {
+            recorder.server.playerList.broadcastSystemMessage(
+                Component.literal("Resumed recording for ${recorder.getName()}"), false
+            )
         }
     }
 
     private fun onChunkRecorderUnloaded(event: ReplayChunkRecorderUnloadedPauseEvent) {
         val recorder = event.recorder
-        if (ServerReplay.config.notifyPlayersLoadingChunks) {
-            recorder.ignore {
-                recorder.server.playerList.broadcastSystemMessage(
-                    Component.literal("Paused recording for ${recorder.getName()}"), false
-                )
-            }
+        recorder.ignore {
+            recorder.server.playerList.broadcastSystemMessage(
+                Component.literal("Paused recording for ${recorder.getName()}"), false
+            )
         }
     }
 
